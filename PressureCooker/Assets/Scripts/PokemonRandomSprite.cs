@@ -17,6 +17,10 @@ public class PokemonRandomSprite : MonoBehaviour
     [Tooltip("If true, starts the cycle-and-land sequence automatically on Start.")]
     [SerializeField] private bool fetchOnStart = true;
 
+    [Header("Catch Limit Settings")]
+    [Tooltip("Maximum number of Pokemon that can be claimed in total.")]
+    [SerializeField] private int maxCatches = 6;
+
     [Header("Cycling / Slot-Machine Effect")]
     [Tooltip("How many random sprites are pre-loaded and flipped through before landing.")]
     [SerializeField] private int cyclePoolSize = 12;
@@ -42,12 +46,25 @@ public class PokemonRandomSprite : MonoBehaviour
     [Tooltip("Sound played instead of Land Sound when a shiny Pokemon is revealed.")]
     [SerializeField] private AudioClip shinyLandSound;
 
+    public static PokemonRandomSprite Instance { get; private set; }
+
+    /// <summary>True once a roll has landed and the Pokemon hasn't been caught yet.</summary>
+    public bool HasPokemonReady { get; private set; }
+
+    /// <summary>Tracks how many Pokemon have been claimed so far.</summary>
+    public int TotalCaughtCount { get; private set; } = 0;
+
     private SpriteRenderer spriteRenderer;
     private AudioSource audioSource;
     private bool isRolling;
 
+    private Sprite currentSprite;
+    private string currentName;
+    private bool currentIsShiny;
+
     private void Awake()
     {
+        Instance = this;
         spriteRenderer = GetComponent<SpriteRenderer>();
         audioSource = GetComponent<AudioSource>();
         audioSource.playOnAwake = false;
@@ -68,20 +85,26 @@ public class PokemonRandomSprite : MonoBehaviour
     public void FetchRandomPokemonSprite()
     {
         if (isRolling) return; // prevent overlapping rolls
+
+        // Stop fetching if the catch limit is reached
+        if (TotalCaughtCount >= maxCatches)
+        {
+            Debug.Log($"Maximum catch limit reached ({maxCatches}). No more Pokemon will be summoned.");
+            spriteRenderer.sprite = null; // Clear the display sprite
+            return;
+        }
+
         StartCoroutine(RollRoutine());
     }
 
     private IEnumerator RollRoutine()
     {
         isRolling = true;
+        HasPokemonReady = false;
 
-        // 1) Decide the final Pokemon and whether it's shiny, up front.
         int finalId = Random.Range(minPokedexId, maxPokedexId + 1);
         bool finalIsShiny = Random.Range(0f, 100f) < shinyChancePercent;
 
-        // 2) Build a request list: cycling frames (never shiny) plus the final
-        //    entry (which may be shiny) appended last, so the pool guarantees
-        //    it ends on the correct sprite.
         List<PokemonRequest> requests = new List<PokemonRequest>();
         for (int i = 0; i < cyclePoolSize; i++)
         {
@@ -99,12 +122,8 @@ public class PokemonRandomSprite : MonoBehaviour
             yield break;
         }
 
-        // The last successfully-loaded entry is our landing frame.
         PokemonResult finalResult = pool[pool.Count - 1];
-
-        // 3) Cycle through the pool sprites, easing the interval from fast to slow
-        //    (slot-machine style: fast start, slow finish).
-        int cycleCount = pool.Count - 1; // last one is the real landing frame
+        int cycleCount = pool.Count - 1;
 
         for (int i = 0; i < cycleCount; i++)
         {
@@ -117,7 +136,6 @@ public class PokemonRandomSprite : MonoBehaviour
             yield return new WaitForSeconds(interval);
         }
 
-        // 4) Land on the final Pokemon.
         spriteRenderer.sprite = finalResult.sprite;
         gameObject.name = finalResult.isShiny ? $"Pokemon_{finalResult.name}_Shiny" : $"Pokemon_{finalResult.name}";
 
@@ -130,7 +148,39 @@ public class PokemonRandomSprite : MonoBehaviour
             ? $"✨ Landed on SHINY Pokemon: {finalResult.name} ✨"
             : $"Landed on random Pokemon: {finalResult.name}");
 
+        currentSprite = finalResult.sprite;
+        currentName = finalResult.name;
+        currentIsShiny = finalResult.isShiny;
+        HasPokemonReady = true;
+
         isRolling = false;
+    }
+
+    /// <summary>
+    /// Called by a pokeball when clicked. If a Pokemon is ready and unclaimed,
+    /// hands over its sprite/name/shiny state, clears the ready state, and
+    /// immediately starts a new roll (if limit isn't reached).
+    /// </summary>
+    public bool TryClaimPokemon(out Sprite sprite, out string pokemonName, out bool isShiny)
+    {
+        if (!HasPokemonReady || TotalCaughtCount >= maxCatches)
+        {
+            sprite = null;
+            pokemonName = null;
+            isShiny = false;
+            return false;
+        }
+
+        sprite = currentSprite;
+        pokemonName = currentName;
+        isShiny = currentIsShiny;
+
+        HasPokemonReady = false;
+        TotalCaughtCount++; // Increment successful catches count
+
+        FetchRandomPokemonSprite(); // Will check maxCatches before rolling again
+
+        return true;
     }
 
     private void PlayClip(AudioClip clip)
@@ -143,8 +193,6 @@ public class PokemonRandomSprite : MonoBehaviour
 
     private IEnumerator FetchPokemonPool(List<PokemonRequest> requests, List<PokemonResult> results)
     {
-        // Kick off all data+sprite fetches in parallel, storing results by index
-        // so ordering (and the guaranteed-last final entry) is preserved.
         PokemonResult[] ordered = new PokemonResult[requests.Count];
         List<Coroutine> running = new List<Coroutine>();
 
@@ -186,7 +234,6 @@ public class PokemonRandomSprite : MonoBehaviour
             PokemonData data = JsonUtility.FromJson<PokemonData>(dataRequest.downloadHandler.text);
             string spriteUrl = request.isShiny ? data.sprites.front_shiny : data.sprites.front_default;
 
-            // Fall back to the normal sprite if a shiny variant isn't available for some reason.
             if (string.IsNullOrEmpty(spriteUrl))
             {
                 spriteUrl = data.sprites.front_default;
@@ -244,7 +291,6 @@ public class PokemonRandomSprite : MonoBehaviour
         public bool isShiny;
     }
 
-    // --- Minimal data classes matching only the JSON fields we need ---
     [System.Serializable]
     private class PokemonData
     {

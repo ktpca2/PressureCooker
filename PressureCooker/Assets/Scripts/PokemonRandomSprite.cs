@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
-// Attach this script to a GameObject that has a SpriteRenderer component
-// (an empty "Sprite 2D" GameObject works perfectly).
 [RequireComponent(typeof(SpriteRenderer))]
 [RequireComponent(typeof(AudioSource))]
 public class PokemonRandomSprite : MonoBehaviour
@@ -48,10 +46,8 @@ public class PokemonRandomSprite : MonoBehaviour
 
     public static PokemonRandomSprite Instance { get; private set; }
 
-    /// <summary>True once a roll has landed and the Pokemon hasn't been caught yet.</summary>
     public bool HasPokemonReady { get; private set; }
 
-    /// <summary>Tracks how many Pokemon have been claimed so far.</summary>
     public int TotalCaughtCount { get; private set; } = 0;
 
     private SpriteRenderer spriteRenderer;
@@ -78,19 +74,13 @@ public class PokemonRandomSprite : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Public entry point — call this from a button, event, or another script
-    /// whenever you want to roll a new random Pokemon with the cycling effect.
-    /// </summary>
     public void FetchRandomPokemonSprite()
     {
-        if (isRolling) return; // prevent overlapping rolls
-
-        // Stop fetching if the catch limit is reached
+        if (isRolling) return; 
         if (TotalCaughtCount >= maxCatches)
         {
             Debug.Log($"Maximum catch limit reached ({maxCatches}). No more Pokemon will be summoned.");
-            spriteRenderer.sprite = null; // Clear the display sprite
+            spriteRenderer.sprite = null; 
             return;
         }
 
@@ -156,11 +146,7 @@ public class PokemonRandomSprite : MonoBehaviour
         isRolling = false;
     }
 
-    /// <summary>
-    /// Called by a pokeball when clicked. If a Pokemon is ready and unclaimed,
-    /// hands over its sprite/name/shiny state, clears the ready state, and
-    /// immediately starts a new roll (if limit isn't reached).
-    /// </summary>
+  
     public bool TryClaimPokemon(out Sprite sprite, out string pokemonName, out bool isShiny)
     {
         if (!HasPokemonReady || TotalCaughtCount >= maxCatches)
@@ -176,9 +162,9 @@ public class PokemonRandomSprite : MonoBehaviour
         isShiny = currentIsShiny;
 
         HasPokemonReady = false;
-        TotalCaughtCount++; // Increment successful catches count
+        TotalCaughtCount++; 
 
-        FetchRandomPokemonSprite(); // Will check maxCatches before rolling again
+        FetchRandomPokemonSprite(); 
 
         return true;
     }

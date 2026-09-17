@@ -1,8 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Attach this to each of your 6 pokeball GameObjects (the ones with
-// SpriteRenderer + Button already on them).
 [RequireComponent(typeof(SpriteRenderer))]
 public class PokeballButton : MonoBehaviour
 {
@@ -21,14 +19,14 @@ public class PokeballButton : MonoBehaviour
     private Sprite emptyPokeballSprite;
     private Button button;
     private AudioSource audioSource;
-    private Collider2D col; // Reference to the object's collider
+    private Collider2D col;
 
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        emptyPokeballSprite = spriteRenderer.sprite; // remember the original closed-pokeball art
+        emptyPokeballSprite = spriteRenderer.sprite; 
 
-        col = GetComponent<Collider2D>(); // Caches BoxCollider2D, CircleCollider2D, etc.
+        col = GetComponent<Collider2D>(); 
 
         button = GetComponent<Button>();
         if (button != null)
@@ -40,7 +38,6 @@ public class PokeballButton : MonoBehaviour
             Debug.LogWarning($"{name} has no Button component — clicking won't be detected.");
         }
 
-        // Reuse an existing AudioSource if present, otherwise add one for the catch sounds.
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
         {
@@ -71,7 +68,6 @@ public class PokeballButton : MonoBehaviour
             gameObject.name = isShiny ? $"Pokeball_{caughtName}_Shiny" : $"Pokeball_{caughtName}";
             transform.localScale = new Vector3(3f, 3f, 3f);
 
-            // Permanently disable the collider upon successfully catching a Pokemon
             if (col != null)
             {
                 col.enabled = false;
@@ -82,7 +78,6 @@ public class PokeballButton : MonoBehaviour
         }
         else
         {
-            // Slot machine hasn't landed on anything yet (or it was just claimed by another ball).
             Debug.Log("No Pokemon ready yet — wait for the slot machine to land on one.");
             PlayClip(deniedSound);
         }
@@ -96,17 +91,12 @@ public class PokeballButton : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Optional helper — empties this pokeball back to its original closed sprite.
-    /// Wire this up to a "release" button or call it when resetting the scene.
-    /// </summary>
-    public void ResetPokeball()
+      public void ResetPokeball()
     {
         spriteRenderer.sprite = emptyPokeballSprite;
         isFilled = false;
         gameObject.name = "Pokeball";
-
-        // Re-enable the collider if the ball is reset
+        
         if (col != null)
         {
             col.enabled = true;
